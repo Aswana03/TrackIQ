@@ -4,6 +4,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../geofence/geofence_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../sos/sos_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -219,7 +220,12 @@ class HomeScreen extends StatelessWidget {
             // SOS
             GestureDetector(
               onTap: () {
-                // SOS functionality will be added later.
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SosScreen(),
+                  ),
+                );
               },
 
               child: Container(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../tracker/tracker_details_screen.dart';
 
 class DeviceManagementScreen extends StatelessWidget {
   const DeviceManagementScreen({super.key});
@@ -43,12 +44,21 @@ class DeviceManagementScreen extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // Tracker 01
-          _DeviceCard(
-            name: 'Tracker 01',
-            description: 'ESP32 · last seen 2m ago',
-            isOnline: true,
-            battery: '86%',
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const TrackerDetailsScreen(),
+                ),
+              );
+            },
+            child: const _DeviceCard(
+              name: 'Tracker 01',
+              description: 'ESP32 · last seen 2m ago',
+              isOnline: true,
+              battery: '86%',
+            ),
           ),
 
           const SizedBox(height: 12),
