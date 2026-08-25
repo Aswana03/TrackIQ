@@ -1,11 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../route_history/route_history_screen.dart';
 
-class TrackerDetailsScreen extends StatelessWidget {
+class TrackerDetailsScreen extends StatefulWidget {
   const TrackerDetailsScreen({super.key});
+
+  @override
+  State<TrackerDetailsScreen> createState() =>
+      _TrackerDetailsScreenState();
+}
+
+class _TrackerDetailsScreenState
+    extends State<TrackerDetailsScreen> {
+
+  GoogleMapController? _mapController;
+
+  // Temporary test location.
+  // Later this will come from the ESP32 + Neo-6M.
+  static const LatLng trackerLocation = LatLng(
+    10.7867,
+    76.6548,
+  );
+
+  final Set<Marker> _markers = {
+    const Marker(
+      markerId: MarkerId('tracker_01'),
+      position: trackerLocation,
+      infoWindow: InfoWindow(
+        title: 'Tracker 01',
+        snippet: 'ESP32 + Neo-6M',
+      ),
+    ),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +54,9 @@ class TrackerDetailsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
+            // ─────────────────────────────
             // Tracker header
+            // ─────────────────────────────
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -72,12 +103,15 @@ class TrackerDetailsScreen extends StatelessWidget {
                   const SizedBox(height: 12),
 
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment:
+                        MainAxisAlignment.center,
                     children: [
+
                       Container(
                         width: 8,
                         height: 8,
-                        decoration: const BoxDecoration(
+                        decoration:
+                            const BoxDecoration(
                           color: AppColors.success,
                           shape: BoxShape.circle,
                         ),
@@ -87,7 +121,8 @@ class TrackerDetailsScreen extends StatelessWidget {
 
                       const Text(
                         'Online',
-                        style: AppTextStyles.statusOnline,
+                        style:
+                            AppTextStyles.statusOnline,
                       ),
                     ],
                   ),
@@ -97,6 +132,9 @@ class TrackerDetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
+            // ─────────────────────────────
+            // Device status
+            // ─────────────────────────────
             const Text(
               'Device status',
               style: AppTextStyles.title,
@@ -109,10 +147,12 @@ class TrackerDetailsScreen extends StatelessWidget {
 
                 Expanded(
                   child: _StatusCard(
-                    icon: Icons.signal_cellular_alt_rounded,
+                    icon:
+                        Icons.signal_cellular_alt_rounded,
                     title: 'Signal',
                     value: 'Strong',
-                    valueColor: AppColors.success,
+                    valueColor:
+                        AppColors.success,
                   ),
                 ),
 
@@ -120,10 +160,12 @@ class TrackerDetailsScreen extends StatelessWidget {
 
                 Expanded(
                   child: _StatusCard(
-                    icon: Icons.battery_6_bar_rounded,
+                    icon:
+                        Icons.battery_6_bar_rounded,
                     title: 'Battery',
                     value: '86%',
-                    valueColor: AppColors.success,
+                    valueColor:
+                        AppColors.success,
                   ),
                 ),
               ],
@@ -139,7 +181,8 @@ class TrackerDetailsScreen extends StatelessWidget {
                     icon: Icons.speed_rounded,
                     title: 'Speed',
                     value: '32 km/h',
-                    valueColor: AppColors.primary,
+                    valueColor:
+                        AppColors.primary,
                   ),
                 ),
 
@@ -150,7 +193,8 @@ class TrackerDetailsScreen extends StatelessWidget {
                     icon: Icons.gps_fixed_rounded,
                     title: 'GPS',
                     value: 'Active',
-                    valueColor: AppColors.success,
+                    valueColor:
+                        AppColors.success,
                   ),
                 ),
               ],
@@ -158,13 +202,50 @@ class TrackerDetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 24),
 
+            // ─────────────────────────────
+            // Map
+            // ─────────────────────────────
             const Text(
-              'Last known location',
+              'Asset location',
               style: AppTextStyles.title,
             ),
 
             const SizedBox(height: 12),
 
+            Container(
+              width: double.infinity,
+              height: 280,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: AppColors.border,
+                ),
+              ),
+              child: GoogleMap(
+                initialCameraPosition:
+                    const CameraPosition(
+                  target: trackerLocation,
+                  zoom: 15,
+                ),
+
+                markers: _markers,
+
+                myLocationButtonEnabled: false,
+
+                zoomControlsEnabled: true,
+
+                mapToolbarEnabled: false,
+
+                onMapCreated: (controller) {
+                  _mapController = controller;
+                },
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Location information
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -191,14 +272,16 @@ class TrackerDetailsScreen extends StatelessWidget {
 
                         Text(
                           'Inside home zone',
-                          style: AppTextStyles.body,
+                          style:
+                              AppTextStyles.body,
                         ),
 
                         SizedBox(height: 4),
 
                         Text(
                           'Last updated 2 minutes ago',
-                          style: AppTextStyles.small,
+                          style:
+                              AppTextStyles.small,
                         ),
                       ],
                     ),
@@ -209,6 +292,9 @@ class TrackerDetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 24),
 
+            // ─────────────────────────────
+            // Device information
+            // ─────────────────────────────
             const Text(
               'Device information',
               style: AppTextStyles.title,
@@ -216,29 +302,31 @@ class TrackerDetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            _InfoRow(
+            const _InfoRow(
               label: 'Device type',
               value: 'ESP32 Tracker',
             ),
 
-            _InfoRow(
+            const _InfoRow(
               label: 'GPS module',
               value: 'Neo-6M',
             ),
 
-            _InfoRow(
+            const _InfoRow(
               label: 'Status',
               value: 'Connected',
             ),
 
-            _InfoRow(
+            const _InfoRow(
               label: 'Last seen',
               value: '2 minutes ago',
             ),
 
             const SizedBox(height: 20),
 
-            // Route history button
+            // ─────────────────────────────
+            // Route history
+            // ─────────────────────────────
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -257,12 +345,15 @@ class TrackerDetailsScreen extends StatelessWidget {
                 label: const Text(
                   'View route history',
                 ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
+                style:
+                    OutlinedButton.styleFrom(
+                  foregroundColor:
+                      AppColors.primary,
                   side: const BorderSide(
                     color: AppColors.primary,
                   ),
-                  minimumSize: const Size(
+                  minimumSize:
+                      const Size(
                     double.infinity,
                     52,
                   ),

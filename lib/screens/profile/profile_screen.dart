@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../analytics/analytics_screen.dart';
+import '../settings/settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -154,6 +156,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.edit_outlined,
             title: 'Edit profile',
             onTap: () {},
+          ),
+
+          _ActionTile(
+            icon: Icons.analytics_outlined,
+            title: 'Analytics',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AnalyticsScreen(),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 10),
+
+          _ActionTile(
+            icon: Icons.settings_outlined,
+            title: 'Settings',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SettingsScreen(),
+                ),
+              );
+            },
           ),
 
           const SizedBox(height: 10),
