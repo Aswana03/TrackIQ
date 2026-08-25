@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../models/tracker_location.dart';
+import '../../services/simulated_location_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../route_history/route_history_screen.dart';
@@ -15,29 +19,158 @@ class TrackerDetailsScreen extends StatefulWidget {
 
 class _TrackerDetailsScreenState
     extends State<TrackerDetailsScreen> {
-
   GoogleMapController? _mapController;
 
-  // Temporary test location.
-  // Later this will come from the ESP32 + Neo-6M.
-  static const LatLng trackerLocation = LatLng(
-    10.7867,
-    76.6548,
-  );
+  final SimulatedLocationService _locationService =
+      SimulatedLocationService();
 
-  final Set<Marker> _markers = {
-    const Marker(
-      markerId: MarkerId('tracker_01'),
-      position: trackerLocation,
-      infoWindow: InfoWindow(
-        title: 'Tracker 01',
-        snippet: 'ESP32 + Neo-6M',
+  late TrackerLocation _trackerData;
+
+  Set<Marker> _markers = {};
+
+  Set<Polyline> _polylines = {};
+
+  final List<LatLng> _routePoints = [];
+
+  StreamSubscription<TrackerLocation>?
+      _locationSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initial tracker data
+    _trackerData = _locationService.currentLocation;
+
+    final initialPosition = LatLng(
+      _trackerData.latitude,
+      _trackerData.longitude,
+    );
+
+    // Add initial location to route
+    _routePoints.add(initialPosition);
+
+    // Initial marker
+    _markers = {
+      Marker(
+        markerId: const MarkerId('tracker_01'),
+        position: initialPosition,
+        infoWindow: InfoWindow(
+          title: 'Tracker 01',
+          snippet:
+              '${_trackerData.speed.toStringAsFixed(0)} km/h',
+        ),
       ),
-    ),
-  };
+    };
+
+    // Initial route
+    _polylines = {
+      Polyline(
+        polylineId:
+            const PolylineId('tracker_route'),
+        points: List<LatLng>.from(_routePoints),
+        width: 5,
+        color: AppColors.primary,
+        startCap: Cap.roundCap,
+        endCap: Cap.roundCap,
+      ),
+    };
+
+    // Listen for simulated tracker updates
+    _locationSubscription =
+        _locationService.locationStream().listen(
+      (location) {
+        if (!mounted) return;
+
+        final newPosition = LatLng(
+          location.latitude,
+          location.longitude,
+        );
+
+        setState(() {
+          // Update complete tracker data
+          _trackerData = location;
+
+          // Add new point to route
+          _routePoints.add(newPosition);
+
+          // Update marker
+          _markers = {
+            Marker(
+              markerId:
+                  const MarkerId('tracker_01'),
+              position: newPosition,
+              infoWindow: InfoWindow(
+                title: 'Tracker 01',
+                snippet:
+                    '${location.speed.toStringAsFixed(0)} km/h',
+              ),
+            ),
+          };
+
+          // Update route
+          _polylines = {
+            Polyline(
+              polylineId:
+                  const PolylineId('tracker_route'),
+              points:
+                  List<LatLng>.from(_routePoints),
+              width: 5,
+              color: AppColors.primary,
+              startCap: Cap.roundCap,
+              endCap: Cap.roundCap,
+            ),
+          };
+        });
+
+        // Follow tracker with camera
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLng(newPosition),
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    _mapController?.dispose();
+
+    super.dispose();
+  }
+
+  String get _lastUpdatedText {
+    final difference =
+        DateTime.now().difference(
+      _trackerData.timestamp,
+    );
+
+    if (difference.inSeconds < 5) {
+      return 'Last updated just now';
+    }
+
+    if (difference.inMinutes < 1) {
+      return 'Last updated '
+          '${difference.inSeconds} seconds ago';
+    }
+
+    return 'Last updated '
+        '${difference.inMinutes} minutes ago';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final trackerPosition = LatLng(
+      _trackerData.latitude,
+      _trackerData.longitude,
+    );
+
+    final bool trackerOnline =
+        _trackerData.isOnline;
+
+    final bool gpsActive =
+        _trackerData.gpsActive;
+
     return Scaffold(
       backgroundColor: AppColors.background,
 
@@ -50,35 +183,46 @@ class _TrackerDetailsScreenState
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
+
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+
           children: [
 
             // ─────────────────────────────
             // Tracker header
             // ─────────────────────────────
+
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
+
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius:
+                    BorderRadius.circular(18),
                 border: Border.all(
                   color: AppColors.border,
                 ),
               ),
+
               child: Column(
                 children: [
 
                   Container(
                     width: 70,
                     height: 70,
+
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(
+                      color:
+                          AppColors.primary.withValues(
                         alpha: 0.15,
                       ),
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius:
+                          BorderRadius.circular(18),
                     ),
+
                     child: const Icon(
                       Icons.devices_other_rounded,
                       size: 38,
@@ -105,24 +249,38 @@ class _TrackerDetailsScreenState
                   Row(
                     mainAxisAlignment:
                         MainAxisAlignment.center,
+
                     children: [
 
                       Container(
                         width: 8,
                         height: 8,
+
                         decoration:
-                            const BoxDecoration(
-                          color: AppColors.success,
-                          shape: BoxShape.circle,
+                            BoxDecoration(
+                          color: trackerOnline
+                              ? AppColors.success
+                              : AppColors.alert,
+                          shape:
+                              BoxShape.circle,
                         ),
                       ),
 
                       const SizedBox(width: 6),
 
-                      const Text(
-                        'Online',
-                        style:
-                            AppTextStyles.statusOnline,
+                      Text(
+                        trackerOnline
+                            ? 'Online'
+                            : 'Offline',
+                        style: trackerOnline
+                            ? AppTextStyles
+                                .statusOnline
+                            : TextStyle(
+                                color:
+                                    AppColors.alert,
+                                fontWeight:
+                                    FontWeight.w600,
+                              ),
                       ),
                     ],
                   ),
@@ -135,6 +293,7 @@ class _TrackerDetailsScreenState
             // ─────────────────────────────
             // Device status
             // ─────────────────────────────
+
             const Text(
               'Device status',
               style: AppTextStyles.title,
@@ -147,10 +306,11 @@ class _TrackerDetailsScreenState
 
                 Expanded(
                   child: _StatusCard(
-                    icon:
-                        Icons.signal_cellular_alt_rounded,
+                    icon: Icons
+                        .signal_cellular_alt_rounded,
                     title: 'Signal',
-                    value: 'Strong',
+                    value:
+                        _trackerData.signalStrength,
                     valueColor:
                         AppColors.success,
                   ),
@@ -160,12 +320,15 @@ class _TrackerDetailsScreenState
 
                 Expanded(
                   child: _StatusCard(
-                    icon:
-                        Icons.battery_6_bar_rounded,
+                    icon: Icons
+                        .battery_6_bar_rounded,
                     title: 'Battery',
-                    value: '86%',
+                    value:
+                        '${_trackerData.battery.toStringAsFixed(0)}%',
                     valueColor:
-                        AppColors.success,
+                        _trackerData.battery > 20
+                            ? AppColors.success
+                            : AppColors.alert,
                   ),
                 ),
               ],
@@ -180,7 +343,8 @@ class _TrackerDetailsScreenState
                   child: _StatusCard(
                     icon: Icons.speed_rounded,
                     title: 'Speed',
-                    value: '32 km/h',
+                    value:
+                        '${_trackerData.speed.toStringAsFixed(0)} km/h',
                     valueColor:
                         AppColors.primary,
                   ),
@@ -190,11 +354,15 @@ class _TrackerDetailsScreenState
 
                 Expanded(
                   child: _StatusCard(
-                    icon: Icons.gps_fixed_rounded,
+                    icon:
+                        Icons.gps_fixed_rounded,
                     title: 'GPS',
-                    value: 'Active',
-                    valueColor:
-                        AppColors.success,
+                    value: gpsActive
+                        ? 'Active'
+                        : 'Inactive',
+                    valueColor: gpsActive
+                        ? AppColors.success
+                        : AppColors.alert,
                   ),
                 ),
               ],
@@ -203,8 +371,9 @@ class _TrackerDetailsScreenState
             const SizedBox(height: 24),
 
             // ─────────────────────────────
-            // Map
+            // Asset location
             // ─────────────────────────────
+
             const Text(
               'Asset location',
               style: AppTextStyles.title,
@@ -215,23 +384,30 @@ class _TrackerDetailsScreenState
             Container(
               width: double.infinity,
               height: 280,
+
               clipBehavior: Clip.antiAlias,
+
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius:
+                    BorderRadius.circular(18),
                 border: Border.all(
                   color: AppColors.border,
                 ),
               ),
+
               child: GoogleMap(
                 initialCameraPosition:
-                    const CameraPosition(
-                  target: trackerLocation,
+                    CameraPosition(
+                  target: trackerPosition,
                   zoom: 15,
                 ),
 
                 markers: _markers,
 
-                myLocationButtonEnabled: false,
+                polylines: _polylines,
+
+                myLocationButtonEnabled:
+                    false,
 
                 zoomControlsEnabled: true,
 
@@ -245,41 +421,48 @@ class _TrackerDetailsScreenState
 
             const SizedBox(height: 12),
 
+            // ─────────────────────────────
             // Location information
+            // ─────────────────────────────
+
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
+
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius:
+                    BorderRadius.circular(16),
               ),
-              child: const Row(
+
+              child: Row(
                 children: [
 
-                  Icon(
+                  const Icon(
                     Icons.location_on_rounded,
                     color: AppColors.primary,
                     size: 28,
                   ),
 
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
 
                   Expanded(
                     child: Column(
                       crossAxisAlignment:
                           CrossAxisAlignment.start,
+
                       children: [
 
-                        Text(
+                        const Text(
                           'Inside home zone',
                           style:
                               AppTextStyles.body,
                         ),
 
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
 
                         Text(
-                          'Last updated 2 minutes ago',
+                          _lastUpdatedText,
                           style:
                               AppTextStyles.small,
                         ),
@@ -295,6 +478,7 @@ class _TrackerDetailsScreenState
             // ─────────────────────────────
             // Device information
             // ─────────────────────────────
+
             const Text(
               'Device information',
               style: AppTextStyles.title,
@@ -312,14 +496,25 @@ class _TrackerDetailsScreenState
               value: 'Neo-6M',
             ),
 
-            const _InfoRow(
-              label: 'Status',
-              value: 'Connected',
+            _InfoRow(
+              label: 'Latitude',
+              value:
+                  _trackerData.latitude
+                      .toStringAsFixed(6),
             ),
 
-            const _InfoRow(
-              label: 'Last seen',
-              value: '2 minutes ago',
+            _InfoRow(
+              label: 'Longitude',
+              value:
+                  _trackerData.longitude
+                      .toStringAsFixed(6),
+            ),
+
+            _InfoRow(
+              label: 'Status',
+              value: trackerOnline
+                  ? 'Connected'
+                  : 'Offline',
             ),
 
             const SizedBox(height: 20),
@@ -327,8 +522,10 @@ class _TrackerDetailsScreenState
             // ─────────────────────────────
             // Route history
             // ─────────────────────────────
+
             SizedBox(
               width: double.infinity,
+
               child: OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -339,19 +536,24 @@ class _TrackerDetailsScreenState
                     ),
                   );
                 },
+
                 icon: const Icon(
                   Icons.history_rounded,
                 ),
+
                 label: const Text(
                   'View route history',
                 ),
+
                 style:
                     OutlinedButton.styleFrom(
                   foregroundColor:
                       AppColors.primary,
+
                   side: const BorderSide(
                     color: AppColors.primary,
                   ),
+
                   minimumSize:
                       const Size(
                     double.infinity,
@@ -368,7 +570,7 @@ class _TrackerDetailsScreenState
 }
 
 
-/// Device status card
+/// Device status card.
 class _StatusCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -389,12 +591,14 @@ class _StatusCard extends StatelessWidget {
 
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius:
+            BorderRadius.circular(16),
       ),
 
       child: Column(
         crossAxisAlignment:
             CrossAxisAlignment.start,
+
         children: [
 
           Icon(
@@ -416,7 +620,8 @@ class _StatusCard extends StatelessWidget {
             value,
             style: TextStyle(
               fontSize: 17,
-              fontWeight: FontWeight.w600,
+              fontWeight:
+                  FontWeight.w600,
               color: valueColor,
             ),
           ),
@@ -427,7 +632,7 @@ class _StatusCard extends StatelessWidget {
 }
 
 
-/// Device information row
+/// Device information row.
 class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
@@ -443,6 +648,7 @@ class _InfoRow extends StatelessWidget {
       padding: const EdgeInsets.only(
         bottom: 14,
       ),
+
       child: Row(
         children: [
 
