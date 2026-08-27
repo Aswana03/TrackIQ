@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "925398138200",
+    "project_id": "trackiq-development",
+    "storage_bucket": "trackiq-development.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:925398138200:android:db86b129828cb5c744792d",
+        "android_client_info": {
+          "package_name": "com.example.trackiq"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANmlzVgilSYEvJqx7BHQbmHO5OCbfiTmU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
