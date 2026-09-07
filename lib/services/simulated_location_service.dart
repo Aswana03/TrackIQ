@@ -3,7 +3,7 @@ import 'dart:async';
 import '../models/tracker_location.dart';
 
 class SimulatedLocationService {
-  static const List<_SimulatedPoint> route = [
+  static const List<_SimulatedPoint>route = [
     _SimulatedPoint(
       latitude: 10.7867,
       longitude: 76.6548,
