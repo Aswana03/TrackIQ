@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "925398138200",
+    "firebase_url": "https://trackiq-development-default-rtdb.firebaseio.com",
     "project_id": "trackiq-development",
     "storage_bucket": "trackiq-development.firebasestorage.app"
   },

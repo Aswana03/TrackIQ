@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../authentication/login_screen.dart';
@@ -18,16 +16,21 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
 
-    Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
+    _goToLogin();
+  }
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const LoginScreen(),
-        ),
-      );
-    });
+  Future<void> _goToLogin() async {
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    debugPrint('SPLASH: Navigating to LoginScreen');
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => const LoginScreen(),
+      ),
+    );
   }
 
   @override
@@ -39,8 +42,6 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-
-              // TrackIQ logo
               Container(
                 width: 86,
                 height: 86,
@@ -57,7 +58,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
               const SizedBox(height: 24),
 
-              // App name
               const Text(
                 'TrackIQ',
                 style: TextStyle(
@@ -69,7 +69,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
               const SizedBox(height: 8),
 
-              // Subtitle
               const Text(
                 'Smart GPS tracking',
                 style: AppTextStyles.subtitle,
@@ -77,7 +76,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
               const SizedBox(height: 32),
 
-              // Loading indicator
               const SizedBox(
                 width: 26,
                 height: 26,

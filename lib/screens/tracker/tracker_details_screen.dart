@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../models/tracker_location.dart';
-import '../../services/simulated_location_service.dart';
+import '../../services/firebase_location_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../route_history/route_history_screen.dart';
@@ -21,10 +21,10 @@ class _TrackerDetailsScreenState
     extends State<TrackerDetailsScreen> {
   GoogleMapController? _mapController;
 
-  final SimulatedLocationService _locationService =
-      SimulatedLocationService();
+  final FirebaseLocationService _firebaseLocationService =
+      FirebaseLocationService();
 
-  late TrackerLocation _trackerData;
+  TrackerLocation? _trackerData;
 
   Set<Marker> _markers = {};
 
@@ -32,55 +32,21 @@ class _TrackerDetailsScreenState
 
   final List<LatLng> _routePoints = [];
 
-  StreamSubscription<TrackerLocation>?
+  StreamSubscription<TrackerLocation?>?
       _locationSubscription;
 
   @override
   void initState() {
     super.initState();
 
-    // Initial tracker data
-    _trackerData = _locationService.currentLocation;
+    _listenToFirebaseLocation();
+  }
 
-    final initialPosition = LatLng(
-      _trackerData.latitude,
-      _trackerData.longitude,
-    );
-
-    // Add initial location to route
-    _routePoints.add(initialPosition);
-
-    // Initial marker
-    _markers = {
-      Marker(
-        markerId: const MarkerId('tracker_01'),
-        position: initialPosition,
-        infoWindow: InfoWindow(
-          title: 'Tracker 01',
-          snippet:
-              '${_trackerData.speed.toStringAsFixed(0)} km/h',
-        ),
-      ),
-    };
-
-    // Initial route
-    _polylines = {
-      Polyline(
-        polylineId:
-            const PolylineId('tracker_route'),
-        points: List<LatLng>.from(_routePoints),
-        width: 5,
-        color: AppColors.primary,
-        startCap: Cap.roundCap,
-        endCap: Cap.roundCap,
-      ),
-    };
-
-    // Listen for simulated tracker updates
+  void _listenToFirebaseLocation() {
     _locationSubscription =
-        _locationService.locationStream().listen(
+        _firebaseLocationService.locationStream().listen(
       (location) {
-        if (!mounted) return;
+        if (!mounted || location == null) return;
 
         final newPosition = LatLng(
           location.latitude,
@@ -88,17 +54,15 @@ class _TrackerDetailsScreenState
         );
 
         setState(() {
-          // Update complete tracker data
           _trackerData = location;
 
-          // Add new point to route
+          // Add new Firebase location to route.
           _routePoints.add(newPosition);
 
-          // Update marker
+          // Update tracker marker.
           _markers = {
             Marker(
-              markerId:
-                  const MarkerId('tracker_01'),
+              markerId: const MarkerId('tracker_01'),
               position: newPosition,
               infoWindow: InfoWindow(
                 title: 'Tracker 01',
@@ -108,7 +72,7 @@ class _TrackerDetailsScreenState
             ),
           };
 
-          // Update route
+          // Update route polyline.
           _polylines = {
             Polyline(
               polylineId:
@@ -123,7 +87,7 @@ class _TrackerDetailsScreenState
           };
         });
 
-        // Follow tracker with camera
+        // Follow tracker with camera.
         _mapController?.animateCamera(
           CameraUpdate.newLatLng(newPosition),
         );
@@ -140,9 +104,15 @@ class _TrackerDetailsScreenState
   }
 
   String get _lastUpdatedText {
+    final trackerData = _trackerData;
+
+    if (trackerData == null) {
+      return 'Waiting for tracker data...';
+    }
+
     final difference =
         DateTime.now().difference(
-      _trackerData.timestamp,
+      trackerData.timestamp,
     );
 
     if (difference.inSeconds < 5) {
@@ -160,16 +130,36 @@ class _TrackerDetailsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final trackerData = _trackerData;
+
+    // Wait until Firebase sends the first location.
+    if (trackerData == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text(
+            'Tracker Details',
+            style: AppTextStyles.title,
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primary,
+          ),
+        ),
+      );
+    }
+
     final trackerPosition = LatLng(
-      _trackerData.latitude,
-      _trackerData.longitude,
+      trackerData.latitude,
+      trackerData.longitude,
     );
 
     final bool trackerOnline =
-        _trackerData.isOnline;
+        trackerData.isOnline;
 
     final bool gpsActive =
-        _trackerData.gpsActive;
+        trackerData.gpsActive;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -310,7 +300,7 @@ class _TrackerDetailsScreenState
                         .signal_cellular_alt_rounded,
                     title: 'Signal',
                     value:
-                        _trackerData.signalStrength,
+                        trackerData.signalStrength,
                     valueColor:
                         AppColors.success,
                   ),
@@ -324,9 +314,9 @@ class _TrackerDetailsScreenState
                         .battery_6_bar_rounded,
                     title: 'Battery',
                     value:
-                        '${_trackerData.battery.toStringAsFixed(0)}%',
+                        '${trackerData.battery.toStringAsFixed(0)}%',
                     valueColor:
-                        _trackerData.battery > 20
+                        trackerData.battery > 20
                             ? AppColors.success
                             : AppColors.alert,
                   ),
@@ -344,7 +334,7 @@ class _TrackerDetailsScreenState
                     icon: Icons.speed_rounded,
                     title: 'Speed',
                     value:
-                        '${_trackerData.speed.toStringAsFixed(0)} km/h',
+                        '${trackerData.speed.toStringAsFixed(0)} km/h',
                     valueColor:
                         AppColors.primary,
                   ),
@@ -354,8 +344,7 @@ class _TrackerDetailsScreenState
 
                 Expanded(
                   child: _StatusCard(
-                    icon:
-                        Icons.gps_fixed_rounded,
+                    icon: Icons.gps_fixed_rounded,
                     title: 'GPS',
                     value: gpsActive
                         ? 'Active'
@@ -499,14 +488,14 @@ class _TrackerDetailsScreenState
             _InfoRow(
               label: 'Latitude',
               value:
-                  _trackerData.latitude
+                  trackerData.latitude
                       .toStringAsFixed(6),
             ),
 
             _InfoRow(
               label: 'Longitude',
               value:
-                  _trackerData.longitude
+                  trackerData.longitude
                       .toStringAsFixed(6),
             ),
 
