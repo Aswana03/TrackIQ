@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../models/tracker_location.dart';
-import '../../services/firebase_location_service.dart';
+import '../../repositories/tracker_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../route_history/route_history_screen.dart';
@@ -20,9 +20,7 @@ class TrackerDetailsScreen extends StatefulWidget {
 class _TrackerDetailsScreenState
     extends State<TrackerDetailsScreen> {
   GoogleMapController? _mapController;
-
-  final FirebaseLocationService _firebaseLocationService =
-      FirebaseLocationService();
+  final TrackerRepository _trackerRepository = TrackerRepository();
 
   TrackerLocation? _trackerData;
 
@@ -44,7 +42,7 @@ class _TrackerDetailsScreenState
 
   void _listenToFirebaseLocation() {
     _locationSubscription =
-        _firebaseLocationService.locationStream().listen(
+        _trackerRepository.locationStream.listen(
       (location) {
         if (!mounted || location == null) return;
 

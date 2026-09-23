@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
 import 'screens/splash/splash_screen.dart';
-import 'services/tracker_sync_service.dart';
+// import 'services/tracker_sync_service.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -13,8 +13,8 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  final trackerSyncService = TrackerSyncService();
-  trackerSyncService.start();
+  // final trackerSyncService = TrackerSyncService();
+  // trackerSyncService.start();
 
   runApp(const TrackIQApp());
 }
