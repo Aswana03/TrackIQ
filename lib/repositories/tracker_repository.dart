@@ -5,7 +5,13 @@ class TrackerRepository {
   final FirebaseLocationService _firebaseLocationService =
       FirebaseLocationService();
 
+  // Live tracker location
   Stream<TrackerLocation?> get locationStream {
     return _firebaseLocationService.locationStream();
+  }
+
+  // Historical tracker locations
+  Stream<List<TrackerLocation>> get historyStream {
+    return _firebaseLocationService.historyStream();
   }
 }
