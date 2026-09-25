@@ -20,12 +20,13 @@ class TrackerDetailsScreen extends StatefulWidget {
 class _TrackerDetailsScreenState
     extends State<TrackerDetailsScreen> {
   GoogleMapController? _mapController;
-  final TrackerRepository _trackerRepository = TrackerRepository();
+
+  final TrackerRepository _trackerRepository =
+      TrackerRepository();
 
   TrackerLocation? _trackerData;
 
   Set<Marker> _markers = {};
-
   Set<Polyline> _polylines = {};
 
   final List<LatLng> _routePoints = [];
@@ -33,18 +34,60 @@ class _TrackerDetailsScreenState
   StreamSubscription<TrackerLocation?>?
       _locationSubscription;
 
+  Timer? _onlineStatusTimer;
+
+  // ------------------------------------------------------------
+  // REAL ONLINE / OFFLINE DETECTION
+  // ------------------------------------------------------------
+
+ bool get _isTrackerOnline {
+    final trackerData = _trackerData;
+
+    if (trackerData == null) {
+      return false;
+    }
+
+    final now = DateTime.now().toUtc();
+    final lastUpdate = trackerData.timestamp.toUtc();
+
+    final difference = now.difference(lastUpdate);
+
+    return difference.inSeconds <= 15;
+  }
+
   @override
   void initState() {
     super.initState();
 
     _listenToFirebaseLocation();
+
+    // Check online/offline status every second.
+    //
+    // This is important because when the ESP32 is powered OFF,
+    // Firebase does not automatically send a new event.
+    // The timer allows the UI to notice that the last update
+    // has become older than 15 seconds.
+    _onlineStatusTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) {
+        if (mounted) {
+          setState(() {});
+        }
+      },
+    );
   }
+
+  // ------------------------------------------------------------
+  // FIREBASE LOCATION LISTENER
+  // ------------------------------------------------------------
 
   void _listenToFirebaseLocation() {
     _locationSubscription =
         _trackerRepository.locationStream.listen(
       (location) {
-        if (!mounted || location == null) return;
+        if (!mounted || location == null) {
+          return;
+        }
 
         final newPosition = LatLng(
           location.latitude,
@@ -60,7 +103,8 @@ class _TrackerDetailsScreenState
           // Update tracker marker.
           _markers = {
             Marker(
-              markerId: const MarkerId('tracker_01'),
+              markerId:
+                  const MarkerId('tracker_01'),
               position: newPosition,
               infoWindow: InfoWindow(
                 title: 'Tracker 01',
@@ -93,13 +137,9 @@ class _TrackerDetailsScreenState
     );
   }
 
-  @override
-  void dispose() {
-    _locationSubscription?.cancel();
-    _mapController?.dispose();
-
-    super.dispose();
-  }
+  // ------------------------------------------------------------
+  // LAST UPDATED TEXT
+  // ------------------------------------------------------------
 
   String get _lastUpdatedText {
     final trackerData = _trackerData;
@@ -125,6 +165,23 @@ class _TrackerDetailsScreenState
     return 'Last updated '
         '${difference.inMinutes} minutes ago';
   }
+
+  // ------------------------------------------------------------
+  // DISPOSE
+  // ------------------------------------------------------------
+
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    _onlineStatusTimer?.cancel();
+    _mapController?.dispose();
+
+    super.dispose();
+  }
+
+  // ------------------------------------------------------------
+  // BUILD
+  // ------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -153,8 +210,15 @@ class _TrackerDetailsScreenState
       trackerData.longitude,
     );
 
-    final bool trackerOnline =
-        trackerData.isOnline;
+    // IMPORTANT:
+    // Do NOT use trackerData.isOnline here.
+    //
+    // The ESP32 currently sends isOnline = true,
+    // and Firebase keeps the last value even after
+    // the ESP32 is powered OFF.
+    //
+    // Instead, calculate the status from the timestamp.
+    final bool trackerOnline = _isTrackerOnline;
 
     final bool gpsActive =
         trackerData.gpsActive;
@@ -178,9 +242,9 @@ class _TrackerDetailsScreenState
 
           children: [
 
-            // ─────────────────────────────
-            // Tracker header
-            // ─────────────────────────────
+            // --------------------------------------------------
+            // TRACKER HEADER
+            // --------------------------------------------------
 
             Container(
               width: double.infinity,
@@ -260,6 +324,7 @@ class _TrackerDetailsScreenState
                         trackerOnline
                             ? 'Online'
                             : 'Offline',
+
                         style: trackerOnline
                             ? AppTextStyles
                                 .statusOnline
@@ -278,9 +343,9 @@ class _TrackerDetailsScreenState
 
             const SizedBox(height: 20),
 
-            // ─────────────────────────────
-            // Device status
-            // ─────────────────────────────
+            // --------------------------------------------------
+            // DEVICE STATUS
+            // --------------------------------------------------
 
             const Text(
               'Device status',
@@ -357,9 +422,9 @@ class _TrackerDetailsScreenState
 
             const SizedBox(height: 24),
 
-            // ─────────────────────────────
-            // Asset location
-            // ─────────────────────────────
+            // --------------------------------------------------
+            // ASSET LOCATION
+            // --------------------------------------------------
 
             const Text(
               'Asset location',
@@ -408,9 +473,9 @@ class _TrackerDetailsScreenState
 
             const SizedBox(height: 12),
 
-            // ─────────────────────────────
-            // Location information
-            // ─────────────────────────────
+            // --------------------------------------------------
+            // LOCATION INFORMATION
+            // --------------------------------------------------
 
             Container(
               width: double.infinity,
@@ -462,9 +527,9 @@ class _TrackerDetailsScreenState
 
             const SizedBox(height: 24),
 
-            // ─────────────────────────────
-            // Device information
-            // ─────────────────────────────
+            // --------------------------------------------------
+            // DEVICE INFORMATION
+            // --------------------------------------------------
 
             const Text(
               'Device information',
@@ -506,9 +571,9 @@ class _TrackerDetailsScreenState
 
             const SizedBox(height: 20),
 
-            // ─────────────────────────────
-            // Route history
-            // ─────────────────────────────
+            // --------------------------------------------------
+            // ROUTE HISTORY
+            // --------------------------------------------------
 
             SizedBox(
               width: double.infinity,
@@ -556,8 +621,10 @@ class _TrackerDetailsScreenState
   }
 }
 
+// ============================================================
+// DEVICE STATUS CARD
+// ============================================================
 
-/// Device status card.
 class _StatusCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -618,8 +685,10 @@ class _StatusCard extends StatelessWidget {
   }
 }
 
+// ============================================================
+// DEVICE INFORMATION ROW
+// ============================================================
 
-/// Device information row.
 class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
@@ -632,7 +701,8 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(
+      padding:
+          const EdgeInsets.only(
         bottom: 14,
       ),
 
@@ -642,13 +712,15 @@ class _InfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: AppTextStyles.small,
+              style:
+                  AppTextStyles.small,
             ),
           ),
 
           Text(
             value,
-            style: AppTextStyles.body,
+            style:
+                AppTextStyles.body,
           ),
         ],
       ),

@@ -1,14 +1,143 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../models/tracker_location.dart';
+import '../../repositories/tracker_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../tracker/tracker_details_screen.dart';
 
-class DeviceManagementScreen extends StatelessWidget {
+class DeviceManagementScreen extends StatefulWidget {
   const DeviceManagementScreen({super.key});
 
   @override
+  State<DeviceManagementScreen> createState() =>
+      _DeviceManagementScreenState();
+}
+
+class _DeviceManagementScreenState
+    extends State<DeviceManagementScreen> {
+  final TrackerRepository _trackerRepository =
+      TrackerRepository();
+
+  StreamSubscription<TrackerLocation?>?
+      _locationSubscription;
+
+  Timer? _statusTimer;
+
+  TrackerLocation? _trackerData;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _listenToTracker();
+
+    // Rebuild every second so Online -> Offline
+    // happens automatically even when Firebase
+    // does not send a new event.
+    _statusTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) {
+        if (mounted) {
+          setState(() {});
+        }
+      },
+    );
+  }
+
+  void _listenToTracker() {
+    _locationSubscription =
+        _trackerRepository.locationStream.listen(
+      (location) {
+        if (!mounted || location == null) {
+          return;
+        }
+
+        setState(() {
+          _trackerData = location;
+        });
+      },
+    );
+  }
+
+  bool get _trackerOnline {
+    final trackerData = _trackerData;
+
+    if (trackerData == null) {
+      return false;
+    }
+
+    final now = DateTime.now().toUtc();
+    final lastUpdate =
+        trackerData.timestamp.toUtc();
+
+    final age = now.difference(lastUpdate);
+
+    // If the ESP32 timestamp is somehow in the future,
+    // don't treat the tracker as online.
+    if (age.isNegative) {
+      return false;
+    }
+
+    return age <= const Duration(seconds: 15);
+  }
+
+  String get _lastSeenText {
+    final trackerData = _trackerData;
+
+    if (trackerData == null) {
+      return 'ESP32 · waiting for data';
+    }
+
+    final now = DateTime.now().toUtc();
+    final lastUpdate =
+        trackerData.timestamp.toUtc();
+
+    final age = now.difference(lastUpdate);
+
+    if (age.isNegative) {
+      return 'ESP32 · time error';
+    }
+
+    if (age.inSeconds < 5) {
+      return 'ESP32 · last seen just now';
+    }
+
+    if (age.inSeconds < 60) {
+      return 'ESP32 · last seen ${age.inSeconds}s ago';
+    }
+
+    if (age.inMinutes < 60) {
+      return 'ESP32 · last seen ${age.inMinutes}m ago';
+    }
+
+    return 'ESP32 · last seen ${age.inHours}h ago';
+  }
+
+  String get _batteryText {
+    final trackerData = _trackerData;
+
+    if (trackerData == null) {
+      return '--%';
+    }
+
+    return '${trackerData.battery.toStringAsFixed(0)}%';
+  }
+
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    _statusTimer?.cancel();
+
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bool trackerOnline = _trackerOnline;
+
     return Scaffold(
       backgroundColor: AppColors.background,
 
@@ -25,7 +154,8 @@ class DeviceManagementScreen extends StatelessWidget {
 
           // Section title
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 'My devices',
@@ -44,27 +174,29 @@ class DeviceManagementScreen extends StatelessWidget {
 
           const SizedBox(height: 12),
 
+          // Tracker 01
           GestureDetector(
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const TrackerDetailsScreen(),
+                  builder: (_) =>
+                      const TrackerDetailsScreen(),
                 ),
               );
             },
-            child: const _DeviceCard(
+            child: _DeviceCard(
               name: 'Tracker 01',
-              description: 'ESP32 · last seen 2m ago',
-              isOnline: true,
-              battery: '86%',
+              description: _lastSeenText,
+              isOnline: trackerOnline,
+              battery: _batteryText,
             ),
           ),
 
           const SizedBox(height: 12),
 
           // Tracker 02
-          _DeviceCard(
+          const _DeviceCard(
             name: 'Tracker 02',
             description: 'ESP32 · last seen 1h ago',
             isOnline: false,
@@ -88,7 +220,8 @@ class DeviceManagementScreen extends StatelessWidget {
                 ),
               ),
               child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
                 children: [
                   Icon(
                     Icons.add_circle_outline,
@@ -222,7 +355,8 @@ class _DeviceCard extends StatelessWidget {
           ),
 
           Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment:
+                CrossAxisAlignment.end,
             children: [
 
               Row(
@@ -241,7 +375,9 @@ class _DeviceCard extends StatelessWidget {
                   const SizedBox(width: 5),
 
                   Text(
-                    isOnline ? 'Online' : 'Offline',
+                    isOnline
+                        ? 'Online'
+                        : 'Offline',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,

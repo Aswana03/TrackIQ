@@ -1,16 +1,131 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../models/tracker_location.dart';
+import '../../repositories/tracker_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../geofence/geofence_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../sos/sos_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final TrackerRepository _trackerRepository =
+      TrackerRepository();
+
+  StreamSubscription<TrackerLocation?>?
+      _locationSubscription;
+
+  Timer? _statusTimer;
+
+  TrackerLocation? _trackerData;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _listenToTracker();
+
+    // Refresh every second so Online -> Offline
+    // happens automatically when the ESP32 stops sending.
+    _statusTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) {
+        if (mounted) {
+          setState(() {});
+        }
+      },
+    );
+  }
+
+  void _listenToTracker() {
+    _locationSubscription =
+        _trackerRepository.locationStream.listen(
+      (location) {
+        if (!mounted || location == null) {
+          return;
+        }
+
+        setState(() {
+          _trackerData = location;
+        });
+      },
+    );
+  }
+
+  bool get _trackerOnline {
+    final trackerData = _trackerData;
+
+    if (trackerData == null) {
+      return false;
+    }
+
+    final now = DateTime.now().toUtc();
+    final lastUpdate =
+        trackerData.timestamp.toUtc();
+
+    final age = now.difference(lastUpdate);
+
+    // Protect against an incorrect/future timestamp.
+    if (age.isNegative) {
+      return false;
+    }
+
+    return age <= const Duration(seconds: 15);
+  }
+
+  String get _speedText {
+    final trackerData = _trackerData;
+
+    if (trackerData == null) {
+      return '-- km/h';
+    }
+
+    return '${trackerData.speed.toStringAsFixed(0)} km/h';
+  }
+
+  String get _batteryText {
+    final trackerData = _trackerData;
+
+    if (trackerData == null) {
+      return '--%';
+    }
+
+    return '${trackerData.battery.toStringAsFixed(0)}%';
+  }
+
+  String get _gpsText {
+    final trackerData = _trackerData;
+
+    if (trackerData == null) {
+      return 'Waiting';
+    }
+
+    return trackerData.gpsActive
+        ? 'Strong'
+        : 'No Fix';
+  }
+
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    _statusTimer?.cancel();
+
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bool trackerOnline = _trackerOnline;
+
     return Scaffold(
       backgroundColor: AppColors.background,
 
@@ -25,7 +140,8 @@ class HomeScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const NotificationsScreen(),
+                  builder: (_) =>
+                      const NotificationsScreen(),
                 ),
               );
             },
@@ -39,7 +155,8 @@ class HomeScreen extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           children: [
 
             // Greeting
@@ -50,8 +167,10 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 4),
 
-            const Text(
-              'Your tracker is active',
+            Text(
+              trackerOnline
+                  ? 'Your tracker is active'
+                  : 'Your tracker is offline',
               style: AppTextStyles.subtitle,
             ),
 
@@ -63,13 +182,15 @@ class HomeScreen extends StatelessWidget {
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius:
+                    BorderRadius.circular(16),
                 border: Border.all(
                   color: AppColors.border,
                 ),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
 
                   Row(
@@ -78,10 +199,12 @@ class HomeScreen extends StatelessWidget {
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(
+                          color:
+                              AppColors.primary.withValues(
                             alpha: 0.15,
                           ),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius:
+                              BorderRadius.circular(12),
                         ),
                         child: const Icon(
                           Icons.location_on_rounded,
@@ -98,12 +221,14 @@ class HomeScreen extends StatelessWidget {
                           children: [
                             Text(
                               'Tracker 01',
-                              style: AppTextStyles.title,
+                              style:
+                                  AppTextStyles.title,
                             ),
                             SizedBox(height: 3),
                             Text(
                               'ESP32 + Neo-6M',
-                              style: AppTextStyles.small,
+                              style:
+                                  AppTextStyles.small,
                             ),
                           ],
                         ),
@@ -114,18 +239,29 @@ class HomeScreen extends StatelessWidget {
                           Container(
                             width: 8,
                             height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.success,
+                            decoration:
+                                BoxDecoration(
+                              color: trackerOnline
+                                  ? AppColors.success
+                                  : AppColors.textMuted,
                               shape: BoxShape.circle,
                             ),
                           ),
 
                           const SizedBox(width: 6),
 
-                          const Text(
-                            'Online',
-                            style:
-                                AppTextStyles.statusOnline,
+                          Text(
+                            trackerOnline
+                                ? 'Online'
+                                : 'Offline',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight:
+                                  FontWeight.w600,
+                              color: trackerOnline
+                                  ? AppColors.success
+                                  : AppColors.textMuted,
+                            ),
                           ),
                         ],
                       ),
@@ -134,10 +270,10 @@ class HomeScreen extends StatelessWidget {
 
                   const SizedBox(height: 22),
 
-                  // Speed
-                  const Text(
-                    '32 km/h',
-                    style: TextStyle(
+                  // Real speed
+                  Text(
+                    _speedText,
+                    style: const TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -162,17 +298,20 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const GeofenceScreen(),
+                    builder: (_) =>
+                        const GeofenceScreen(),
                   ),
                 );
               },
 
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding:
+                    const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius:
+                      BorderRadius.circular(16),
                 ),
 
                 child: const Row(
@@ -193,14 +332,16 @@ class HomeScreen extends StatelessWidget {
                         children: [
                           Text(
                             'Inside home zone',
-                            style: AppTextStyles.title,
+                            style:
+                                AppTextStyles.title,
                           ),
 
                           SizedBox(height: 3),
 
                           Text(
                             'Geofence status',
-                            style: AppTextStyles.small,
+                            style:
+                                AppTextStyles.small,
                           ),
                         ],
                       ),
@@ -223,7 +364,8 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const SosScreen(),
+                    builder: (_) =>
+                        const SosScreen(),
                   ),
                 );
               },
@@ -234,7 +376,8 @@ class HomeScreen extends StatelessWidget {
 
                 decoration: BoxDecoration(
                   color: AppColors.alert,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius:
+                      BorderRadius.circular(18),
                 ),
 
                 child: const Center(
@@ -258,10 +401,12 @@ class HomeScreen extends StatelessWidget {
 
                 Expanded(
                   child: _InfoCard(
-                    icon: Icons.battery_6_bar_rounded,
+                    icon:
+                        Icons.battery_6_bar_rounded,
                     title: 'Battery',
-                    value: '86%',
-                    valueColor: AppColors.success,
+                    value: _batteryText,
+                    valueColor:
+                        AppColors.success,
                   ),
                 ),
 
@@ -269,10 +414,15 @@ class HomeScreen extends StatelessWidget {
 
                 Expanded(
                   child: _InfoCard(
-                    icon: Icons.gps_fixed_rounded,
+                    icon:
+                        Icons.gps_fixed_rounded,
                     title: 'GPS',
-                    value: 'Strong',
-                    valueColor: AppColors.success,
+                    value: _gpsText,
+                    valueColor: _trackerData
+                                ?.gpsActive ==
+                            true
+                        ? AppColors.success
+                        : AppColors.textMuted,
                   ),
                 ),
               ],
@@ -283,7 +433,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
 
 /// Quick information card used for Battery and GPS.
 class _InfoCard extends StatelessWidget {
@@ -310,7 +459,8 @@ class _InfoCard extends StatelessWidget {
       ),
 
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
 
           Icon(
