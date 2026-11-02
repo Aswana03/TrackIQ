@@ -52,9 +52,10 @@ class _TrackerDetailsScreenState
 
     final difference = now.difference(lastUpdate);
 
-    return difference.inSeconds <= 15;
+    // Allow a small delay in Firebase updates.
+    return !difference.isNegative &&
+        difference.inSeconds <= 30;
   }
-
   @override
   void initState() {
     super.initState();

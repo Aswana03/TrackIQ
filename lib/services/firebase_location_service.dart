@@ -1,3 +1,4 @@
+
 import 'package:firebase_database/firebase_database.dart';
 
 import '../models/tracker_location.dart';
@@ -6,16 +7,13 @@ class FirebaseLocationService {
   final DatabaseReference _database =
       FirebaseDatabase.instance.ref('trackers/trackiq');
 
-  // =====================================================
-  // Current live location
-  // =====================================================
-
+  // Update current location from the Flutter app, if needed.
   Future<void> updateLocation(TrackerLocation location) async {
-    await _database.set({
+    await _database.update({
       'latitude': location.latitude,
       'longitude': location.longitude,
       'speed': location.speed,
-      'timestamp': location.timestamp.toIso8601String(),
+      'timestamp': location.timestamp.toUtc().toIso8601String(),
       'gpsActive': location.gpsActive,
       'battery': location.battery,
       'isOnline': location.isOnline,
@@ -23,77 +21,80 @@ class FirebaseLocationService {
     });
   }
 
+  // Current live location
   Stream<TrackerLocation?> locationStream() {
     return _database.onValue.map((event) {
       final data = event.snapshot.value;
 
-      if (data == null || data is! Map) {
+      if (data is! Map) return null;
+
+      try {
+        final timestamp = DateTime.parse(
+          data['timestamp'].toString(),
+        ).toUtc();
+
+        return TrackerLocation(
+          latitude: _asDouble(data['latitude']),
+          longitude: _asDouble(data['longitude']),
+          speed: _asDouble(data['speed']),
+          timestamp: timestamp,
+          gpsActive: data['gpsActive'] == true,
+          battery: _asDouble(data['battery']),
+          isOnline: data['isOnline'] == true,
+          signalStrength:
+              data['signalStrength']?.toString() ?? 'Unknown',
+        );
+      } catch (e) {
+        print('Error parsing live tracker data: $e');
         return null;
       }
-
-      return TrackerLocation(
-        latitude: (data['latitude'] as num).toDouble(),
-        longitude: (data['longitude'] as num).toDouble(),
-        speed: (data['speed'] as num).toDouble(),
-        timestamp: DateTime.parse(data['timestamp'] as String),
-        gpsActive: data['gpsActive'] as bool,
-        battery: (data['battery'] as num).toDouble(),
-        isOnline: data['isOnline'] as bool,
-        signalStrength: data['signalStrength'] as String,
-      );
     });
   }
 
-  // =====================================================
-  // Route history
-  // =====================================================
-
+  // Historical tracker locations
   Stream<List<TrackerLocation>> historyStream() {
     final historyRef = _database.child('history');
 
     return historyRef.onValue.map((event) {
       final data = event.snapshot.value;
 
-      if (data == null || data is! Map) {
-        return <TrackerLocation>[];
-      }
+      if (data is! Map) return <TrackerLocation>[];
 
       final history = <TrackerLocation>[];
 
       for (final entry in data.entries) {
         final item = entry.value;
 
-        if (item is! Map) {
-          continue;
-        }
+        if (item is! Map) continue;
 
         try {
           history.add(
             TrackerLocation(
-              latitude: (item['latitude'] as num).toDouble(),
-              longitude: (item['longitude'] as num).toDouble(),
-              speed: (item['speed'] as num).toDouble(),
+              latitude: _asDouble(item['latitude']),
+              longitude: _asDouble(item['longitude']),
+              speed: _asDouble(item['speed']),
               timestamp: DateTime.parse(
-                item['timestamp'] as String,
-              ),
-              gpsActive: item['gpsActive'] as bool,
-              battery: (item['battery'] as num).toDouble(),
-              isOnline: item['isOnline'] as bool,
+                item['timestamp'].toString(),
+              ).toUtc(),
+              gpsActive: item['gpsActive'] == true,
+              battery: _asDouble(item['battery']),
+              isOnline: item['isOnline'] == true,
               signalStrength:
-                  item['signalStrength'] as String,
+                  item['signalStrength']?.toString() ?? 'Unknown',
             ),
           );
         } catch (e) {
-          // Ignore malformed history entries.
+          print('Skipping malformed history entry: $e');
         }
       }
 
-      // Oldest → newest
-      history.sort(
-        (a, b) => a.timestamp.compareTo(b.timestamp),
-      );
-
+      history.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       return history;
     });
+  }
+
+  double _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0.0;
   }
 }

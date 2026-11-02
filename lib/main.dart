@@ -1,21 +1,32 @@
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
 import 'screens/splash/splash_screen.dart';
-// import 'services/tracker_sync_service.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  debugPrint('TRACKIQ: Starting application');
 
-  // final trackerSyncService = TrackerSyncService();
-  // trackerSyncService.start();
+  try {
+    debugPrint('TRACKIQ: Firebase apps before init: ${Firebase.apps.length}');
 
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+
+    debugPrint('TRACKIQ: Firebase initialized successfully');
+  } catch (e, stackTrace) {
+    debugPrint('TRACKIQ: Firebase initialization failed: $e');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+
+  debugPrint('TRACKIQ: Launching app');
   runApp(const TrackIQApp());
 }
 
