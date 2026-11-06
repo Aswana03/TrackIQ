@@ -10,6 +10,7 @@ import '../../models/tracker_location.dart';
 import '../../repositories/tracker_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../services/trackiq_foreground_service.dart';
 
 class LiveMapScreen extends StatefulWidget {
   const LiveMapScreen({super.key});
@@ -31,6 +32,8 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   TrackerLocation? _trackerData;
 
   bool _hasCenteredOnTracker = false;
+  bool _isMonitoring = false;
+  bool _isChangingMonitoring = false;
 
   Set<Marker> _markers = {};
 
@@ -67,6 +70,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
 
     _loadGeofence();
     _listenToTracker();
+    _refreshMonitoringStatus();
 
     // Refresh online/offline status every second.
     _statusTimer = Timer.periodic(
@@ -77,6 +81,61 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
         }
       },
     );
+  }
+
+  Future<void> _refreshMonitoringStatus() async {
+    final running = await TrackIQForegroundService.isRunning;
+    if (!mounted) return;
+
+    setState(() {
+      _isMonitoring = running;
+    });
+  }
+
+  Future<void> _toggleBackgroundMonitoring() async {
+    if (_isChangingMonitoring) return;
+
+    setState(() {
+      _isChangingMonitoring = true;
+    });
+
+    try {
+      final success = _isMonitoring
+          ? await TrackIQForegroundService.stopMonitoring()
+          : await TrackIQForegroundService.startMonitoring();
+
+      if (!mounted) return;
+
+      await _refreshMonitoringStatus();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? (_isMonitoring
+                    ? 'Background monitoring started.'
+                    : 'Background monitoring stopped.')
+                : 'Could not change background monitoring. Check notification permission.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Background service error: $error'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isChangingMonitoring = false;
+        });
+      }
+    }
   }
 
   // ----------------------------------------------------------
@@ -556,6 +615,25 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
             tooltip: 'Geofence settings',
             onPressed: _showGeofenceSettings,
             icon: const Icon(Icons.radar_rounded),
+          ),
+          IconButton(
+            tooltip: _isMonitoring
+                ? 'Stop background monitoring'
+                : 'Start background monitoring',
+            onPressed:
+                _isChangingMonitoring ? null : _toggleBackgroundMonitoring,
+            icon: _isChangingMonitoring
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    _isMonitoring
+                        ? Icons.notifications_active
+                        : Icons.notifications_off_outlined,
+                    color: _isMonitoring ? AppColors.success : null,
+                  ),
           ),
           IconButton(
             onPressed: _recenterMap,

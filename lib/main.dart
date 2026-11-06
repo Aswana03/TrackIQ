@@ -1,13 +1,20 @@
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import 'firebase_options.dart';
 import 'screens/splash/splash_screen.dart';
+import 'services/trackiq_foreground_service.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Required for communication between the UI and foreground task.
+  FlutterForegroundTask.initCommunicationPort();
+
+  // Configure the foreground service before runApp().
+  TrackIQForegroundService.initialize();
 
   debugPrint('TRACKIQ: Starting application');
 
@@ -26,7 +33,6 @@ Future<void> main() async {
     debugPrintStack(stackTrace: stackTrace);
   }
 
-  debugPrint('TRACKIQ: Launching app');
   runApp(const TrackIQApp());
 }
 
