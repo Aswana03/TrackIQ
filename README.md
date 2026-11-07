@@ -190,7 +190,7 @@ flutter run
 
 Download the application from GitHub Releases:
 
-👉 [Download TrackIQ APK](ADD_GITHUB_RELEASE_LINK_HERE)
+👉 [Download TrackIQ APK](https://github.com/Aswana03/TrackIQ/releases/download/v1.0.0/app-release.apk)
 
 *Note: This is a prototype application distributed outside the Google Play Store.*
 
